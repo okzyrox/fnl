@@ -382,42 +382,6 @@ proc gradCoordDual(seed: int, xPrimed: int, yPrimed: int, zPrimed: int, xd: floa
 ## FNL
 
 ### generic
-
-### Template function names here for the moment until I finish implemnting them all
-proc genNoiseSingle(fnl: FnlNoise, seed: int, x: float, y: float): float =
-    case fnl.noiseType
-        of FnlNoiseType.OpenSimplex2:
-            result = singleSimplex(fnl, seed, x, y)
-        of FnlNoiseType.OpenSimplex2S:
-            result = singleSimplex(fnl, seed, x, y)
-        of FnlNoiseType.Cellular:
-            result = singleCellular(fnl, seed, x, y)
-        of FnlNoiseType.Perlin:
-            result = singlePerlin(fnl, seed, x, y)
-        of FnlNoiseType.ValueCubic:
-            result = singleValueCubic(fnl, seed, x, y)
-        of FnlNoiseType.Value:
-            result = singleValue(fnl, seed, x, y)
-        else:
-            result = 0.0
-
-proc genNoiseSingle(fnl: FnlNoise, seed: int, x: float, y: float, z: float): float =
-    case fnl.noiseType
-        of FnlNoiseType.OpenSimplex2:
-            result = singleSimplex(fnl, seed, x, y, z)
-        of FnlNoiseType.OpenSimplex2S:
-            result = singleSimplex(fnl, seed, x, y, z)
-        of FnlNoiseType.Cellular:
-            result = singleCellular(fnl, seed, x, y, z)
-        of FnlNoiseType.Perlin:
-            result = singlePerlin(fnl, seed, x, y, z)
-        of FnlNoiseType.ValueCubic:
-            result = singleValueCubic(fnl, seed, x, y, z)
-        of FnlNoiseType.Value:
-            result = singleValue(fnl, seed, x, y, z)
-        else:
-            result = 0.0
-
 ### noise coordinate transforms
 
 proc transformNoiseCoordinate(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
@@ -530,119 +494,6 @@ proc updateWarpTransformType3D(fnl: var FnlNoise): void =
                 else:
                     fnl.warpTransformType = FnlTransformType.None
 
-### fractal FBm
-
-proc genFractalFBm(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): float =
-    var seed = fnl.seed
-    var sum: float = 0.0
-    var amp = fnl.fractalBounding
-
-    for i in 0 ..< fnl.octaves:
-        seed += 1
-        var noise = genNoiseSingle(fnl, seed, x, y)
-        sum += noise * amp
-        amp *= lerp(1.0, fastMin(noise + 1, 2) * 0.5, fnl.weightedStrength)
-
-        x = x * fnl.lacunarity
-        y = y * fnl.lacunarity
-        amp *= fnl.gain
-    
-    result = sum
-
-proc genFractalFBm(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
-    var seed = fnl.seed
-    var sum: float = 0.0
-    var amp = fnl.fractalBounding
-
-    for i in 0 ..< fnl.octaves:
-        seed += 1
-        var noise = genNoiseSingle(fnl, seed, x, y, z)
-        sum += noise * amp
-        amp *= lerp(1.0, (noise + 1) * 0.5, fnl.weightedStrength)
-
-        x = x * fnl.lacunarity
-        y = y * fnl.lacunarity
-        z = z * fnl.lacunarity
-        amp *= fnl.gain
-    
-    result = sum
-
-### fractal Ridged
-
-proc genFractalRidged(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): float =
-    var seed = fnl.seed
-    var sum: float = 0.0
-    var amp = fnl.fractalBounding
-
-    for i in 0 ..< fnl.octaves:
-        seed += 1
-        var noise = fastAbs(genNoiseSingle(fnl, seed, x, y))
-        sum += (noise * -2 + 1) * amp
-        amp *= lerp(1.0, 1 - noise, fnl.weightedStrength)
-
-        x = x * fnl.lacunarity
-        y = y * fnl.lacunarity
-        amp *= fnl.gain
-    
-    result = sum
-
-proc genFractalRidged(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
-    var seed = fnl.seed
-    var sum: float = 0.0
-    var amp = fnl.fractalBounding
-
-    for i in 0 ..< fnl.octaves:
-        seed += 1
-        var noise = fastAbs(genNoiseSingle(fnl, seed, x, y, z))
-        sum += (noise * -2 + 1) * amp
-        amp *= lerp(1.0, 1 - noise, fnl.weightedStrength)
-
-        x = x * fnl.lacunarity
-        y = y * fnl.lacunarity
-        z = z * fnl.lacunarity
-        amp *= fnl.gain
-    
-    result = sum
-
-### fractal PingPong
-
-proc genFractalPingPong(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): float =
-    var seed = fnl.seed
-    var sum: float = 0.0
-    var amp = fnl.fractalBounding
-
-    for i in 0 ..< fnl.octaves:
-        seed += 1
-        var n1 = genNoiseSingle(fnl, seed, x, y) + 1 * fnl.pingPongStrength
-        var noise = pingPong(n1)
-        sum += (noise - 0.5) * 2 * amp
-        amp *= lerp(1.0, noise, fnl.weightedStrength)
-
-        x = x * fnl.lacunarity
-        y = y * fnl.lacunarity
-        amp *= fnl.gain
-    
-    result = sum
-
-proc genFractalPingPong(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
-    var seed = fnl.seed
-    var sum: float = 0.0
-    var amp = fnl.fractalBounding
-
-    for i in 0 ..< fnl.octaves:
-        seed += 1
-        var n1 = genNoiseSingle(fnl, seed, x, y, z) + 1 * fnl.pingPongStrength
-        var noise = pingPong(n1)
-        sum += (noise - 0.5) * 2 * amp
-        amp *= lerp(1.0, noise, fnl.weightedStrength)
-
-        x = x * fnl.lacunarity
-        y = y * fnl.lacunarity
-        z = z * fnl.lacunarity
-        amp *= fnl.gain
-    
-    result = sum
-
 
 ### simplex/opensimplex2 noises
 
@@ -704,7 +555,7 @@ proc singleSimplex(fnl: FnlNoise, seed: int, x: var FnlFloat, y: var FnlFloat): 
     var final = (n0 + n1 + n2) * 99.83685446303647
     result = final
 
-proc singleOpenSimplex2(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var float): float =
+proc singleOpenSimplex2(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
 
     var i = fastRound(x)
     var j = fastRound(y)
@@ -825,9 +676,547 @@ proc singleOpenSimplex2S(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var F
             if a2 > 0:
                 value += (a2 * a2) * (a2 * a2) * gradCoord(seed, i, j + PrimeY, x2, y2)
 
-        # do later
-        # brain hurts
-        # https://github.com/Auburn/FastNoiseLite/blob/683ff0c848538f669240670ceb1c1ff3bb05b777/CSharp/FastNoiseLite.cs#L1310
+        if yi - xmyi > 1:
+            var x3 = x0 + (G2 - 1)
+            var y3 = y0 + (G2 - 2)
+            var a3 = (2.0 / 3.0) - x3 * x3 - y3 * y3
+            if a3 > 0:
+                value += (a3 * a3) * (a3 * a3) * gradCoord(seed, i + PrimeX, j + (PrimeY shl 1), x3, y3)
+        else:
+            var x3 = x0 + (G2 - 1)
+            var y3 = y0 + G2
+            var a3 = (2.0 / 3.0) - x3 * x3 - y3 * y3
+            if a3 > 0:
+                value += (a3 * a3) * (a3 * a3) * gradCoord(seed, i + PrimeX, j, x3, y3)
+    else:
+
+        if xi + xmyi < 0:
+            var x2 = x0 + (1 - G2)
+            var y2 = y0 + (2 - G2)
+            var a2 = (2.0 / 3.0) - x2 * x2 - y2 * y2
+            if a2 > 0:
+                value += (a2 * a2) * (a2 * a2) * gradCoord(seed, i - PrimeX, j, x2, y2)
+        else:
+            var x2 = x0 - G2
+            var y2 = y0 + G2
+            var a2 = (2.0 / 3.0) - x2 * x2 - y2 * y2
+            if a2 > 0:
+                value += (a2 * a2) * (a2 * a2) * gradCoord(seed, i + PrimeX, j, x2, y2)
+
+        if yi < xmyi:
+            var x2 = x0 - G2
+            var y2 = y0 + G2
+            var a2 = (2.0 / 3.0) - x2 * x2 - y2 * y2
+            if a2 > 0:
+                value += (a2 * a2) * (a2 * a2) * gradCoord(seed, i, j - PrimeY, x2, y2)
+        else:
+            var x2 = x0 + G2
+            var y2 = y0 - G2
+            var a2 = (2.0 / 3.0) - x2 * x2 - y2 * y2
+            if a2 > 0:
+                value += (a2 * a2) * (a2 * a2) * gradCoord(seed, i, j + PrimeY, x2, y2)
+
+    result = value * 32.69428253173828125
+
+proc singleOpenSimplex2S(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
+    var i = fastFloor(x)
+    var j = fastFloor(y)
+    var k = fastFloor(z)
+    let xi = float(x - i.float)
+    let yi = float(y - j.float)
+    let zi = float(z - k.float)
+
+    i *= PrimeX
+    j *= PrimeY
+    k *= PrimeZ
+    var seed2 = seed + 1293373
+
+    let xNMask = (-0.5 - xi).int
+    let yNMask = (-0.5 - yi).int
+    let zNMask = (-0.5 - zi).int
+
+    let x0 = xi + xNMask.float
+    let y0 = yi + yNMask.float
+    let z0 = zi + zNMask.float
+    let a0 = 0.75 - x0 * x0 - y0 * y0 - z0 * z0
+    var value = (a0 * a0) * (a0 * a0) * gradCoord(seed,
+        i + (xNMask and PrimeX), j + (yNMask and PrimeY), k + (zNMask and PrimeZ), x0, y0, z0)
+
+    let x1 = xi - 0.5
+    let y1 = yi - 0.5
+    let z1 = zi - 0.5
+    let a1 = 0.75 - x1 * x1 - y1 * y1 - z1 * z1
+    value += (a1 * a1) * (a1 * a1) * gradCoord(seed2,
+        i + PrimeX, j + PrimeY, k + PrimeZ, x1, y1, z1)
+
+    let xAFlipMask0 = ((xNMask or 1) shl 1).float * x1
+    let yAFlipMask0 = ((yNMask or 1) shl 1).float * y1
+    let zAFlipMask0 = ((zNMask or 1) shl 1).float * z1
+    let xAFlipMask1 = (-2 - (xNMask shl 2)).float * x1 - 1.0
+    let yAFlipMask1 = (-2 - (yNMask shl 2)).float * y1 - 1.0
+    let zAFlipMask1 = (-2 - (zNMask shl 2)).float * z1 - 1.0
+
+    var skip5 = false
+    let a2 = xAFlipMask0 + a0
+    if a2 > 0:
+        let x2 = x0 - (xNMask or 1).float
+        let y2 = y0
+        let z2 = z0
+        value += (a2 * a2) * (a2 * a2) * gradCoord(seed,
+            i + (not xNMask and PrimeX), j + (yNMask and PrimeY), k + (zNMask and PrimeZ), x2, y2, z2)
+    else:
+        let a3 = yAFlipMask0 + zAFlipMask0 + a0
+        if a3 > 0:
+            let x3 = x0
+            let y3 = y0 - (yNMask or 1).float
+            let z3 = z0 - (zNMask or 1).float
+            value += (a3 * a3) * (a3 * a3) * gradCoord(seed,
+                i + (xNMask and PrimeX), j + (not yNMask and PrimeY), k + (not zNMask and PrimeZ), x3, y3, z3)
+
+        let a4 = xAFlipMask1 + a1
+        if a4 > 0:
+            let x4 = (xNMask or 1).float + x1
+            let y4 = y1
+            let z4 = z1
+            value += (a4 * a4) * (a4 * a4) * gradCoord(seed2,
+                i + (xNMask and (PrimeX * 2)), j + PrimeY, k + PrimeZ, x4, y4, z4)
+            skip5 = true
+
+    var skip9 = false
+    let a6 = yAFlipMask0 + a0
+    if a6 > 0:
+        let x6 = x0
+        let y6 = y0 - (yNMask or 1).float
+        let z6 = z0
+        value += (a6 * a6) * (a6 * a6) * gradCoord(seed,
+            i + (xNMask and PrimeX), j + (not yNMask and PrimeY), k + (zNMask and PrimeZ), x6, y6, z6)
+    else:
+        let a7 = xAFlipMask0 + zAFlipMask0 + a0
+        if a7 > 0:
+            let x7 = x0 - (xNMask or 1).float
+            let y7 = y0
+            let z7 = z0 - (zNMask or 1).float
+            value += (a7 * a7) * (a7 * a7) * gradCoord(seed,
+                i + (not xNMask and PrimeX), j + (yNMask and PrimeY), k + (not zNMask and PrimeZ), x7, y7, z7)
+
+        let a8 = yAFlipMask1 + a1
+        if a8 > 0:
+            let x8 = x1
+            let y8 = (yNMask or 1).float + y1
+            let z8 = z1
+            value += (a8 * a8) * (a8 * a8) * gradCoord(seed2,
+                i + PrimeX, j + (yNMask and (PrimeY shl 1)), k + PrimeZ, x8, y8, z8)
+            skip9 = true
+
+    var skipD = false
+    let aA = zAFlipMask0 + a0
+    if aA > 0:
+        let xA = x0
+        let yA = y0
+        let zA = z0 - (zNMask or 1).float
+        value += (aA * aA) * (aA * aA) * gradCoord(seed,
+            i + (xNMask and PrimeX), j + (yNMask and PrimeY), k + (not zNMask and PrimeZ), xA, yA, zA)
+    else:
+        let aB = xAFlipMask0 + yAFlipMask0 + a0
+        if aB > 0:
+            let xB = x0 - (xNMask or 1).float
+            let yB = y0 - (yNMask or 1).float
+            let zB = z0
+            value += (aB * aB) * (aB * aB) * gradCoord(seed,
+                i + (not xNMask and PrimeX), j + (not yNMask and PrimeY), k + (zNMask and PrimeZ), xB, yB, zB)
+
+        let aC = zAFlipMask1 + a1
+        if aC > 0:
+            let xC = x1
+            let yC = y1
+            let zC = (zNMask or 1).float + z1
+            value += (aC * aC) * (aC * aC) * gradCoord(seed2,
+                i + PrimeX, j + PrimeY, k + (zNMask and (PrimeZ shl 1)), xC, yC, zC)
+            skipD = true
+
+    if not skip5:
+        let a5 = yAFlipMask1 + zAFlipMask1 + a1
+        if a5 > 0:
+            let x5 = x1
+            let y5 = (yNMask or 1).float + y1
+            let z5 = (zNMask or 1).float + z1
+            value += (a5 * a5) * (a5 * a5) * gradCoord(seed2,
+                i + PrimeX, j + (yNMask and (PrimeY shl 1)), k + (zNMask and (PrimeZ shl 1)), x5, y5, z5)
+
+    if not skip9:
+        let a9 = xAFlipMask1 + zAFlipMask1 + a1
+        if a9 > 0:
+            let x9 = (xNMask or 1).float + x1
+            let y9 = y1
+            let z9 = (zNMask or 1).float + z1
+            value += (a9 * a9) * (a9 * a9) * gradCoord(seed2,
+                i + (xNMask and (PrimeX * 2)), j + PrimeY, k + (zNMask and (PrimeZ shl 1)), x9, y9, z9)
+
+    if not skipD:
+        let aD = xAFlipMask1 + yAFlipMask1 + a1
+        if aD > 0:
+            let xD = (xNMask or 1).float + x1
+            let yD = (yNMask or 1).float + y1
+            let zD = z1
+            value += (aD * aD) * (aD * aD) * gradCoord(seed2,
+                i + (xNMask and (PrimeX shl 1)), j + (yNMask and (PrimeY shl 1)), k + PrimeZ, xD, yD, zD)
+
+    result = value * 9.046026385208288
+
+proc singleCellular(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat): float =
+    var xr = fastRound(x)
+    var yr = fastRound(y)
+
+    var distance0 = high(float)
+    var distance1 = high(float)
+    var closestHash = 0
+
+    let cellularJitter = 0.43701595 * fnl.cellularJitterModifier
+
+    var xPrimed = (xr - 1) * PrimeX
+    var yPrimedBase = (yr - 1) * PrimeY
+
+    case fnl.cellularDistanceFunction:
+        of FnlCellularDistanceFunction.Euclidean, FnlCellularDistanceFunction.EuclideanSq:
+            for xi in xr-1 .. xr+1:
+                var yPrimed = yPrimedBase
+
+                for yi in yr-1 .. yr+1:
+                    let hash = hash(seed, xPrimed, yPrimed)
+                    let idx = hash and (255 shl 1)
+
+                    let vecX = (xi.float - x).float + RandVecs2D[idx] * cellularJitter
+                    let vecY = (yi.float - y).float + RandVecs2D[idx or 1] * cellularJitter
+
+                    let newDistance = vecX * vecX + vecY * vecY
+
+                    distance1 = fastMax(fastMin(distance1, newDistance), distance0)
+                    if newDistance < distance0:
+                        distance0 = newDistance
+                        closestHash = hash
+                    yPrimed += PrimeY
+                xPrimed += PrimeX
+        
+        of FnlCellularDistanceFunction.Manhattan:
+            for xi in xr-1 .. xr+1:
+                var yPrimed = yPrimedBase
+
+                for yi in yr-1 .. yr+1:
+                    let hash = hash(seed, xPrimed, yPrimed)
+                    let idx = hash and (255 shl 1)
+
+                    let vecX = (xi.float - x).float + RandVecs2D[idx] * cellularJitter
+                    let vecY = (yi.float - y).float + RandVecs2D[idx or 1] * cellularJitter
+
+                    let newDistance = fastAbs(vecX) + fastAbs(vecY)
+
+                    distance1 = fastMax(fastMin(distance1, newDistance), distance0)
+                    if newDistance < distance0:
+                        distance0 = newDistance
+                        closestHash = hash
+                    yPrimed += PrimeY
+                xPrimed += PrimeX
+        
+        of FnlCellularDistanceFunction.Hybrid:
+            for xi in xr-1 .. xr+1:
+                var yPrimed = yPrimedBase
+
+                for yi in yr-1 .. yr+1:
+                    let hash = hash(seed, xPrimed, yPrimed)
+                    let idx = hash and (255 shl 1)
+
+                    let vecX = (xi.float - x).float + RandVecs2D[idx] * cellularJitter
+                    let vecY = (yi.float - y).float + RandVecs2D[idx or 1] * cellularJitter
+
+                    let newDistance = (fastAbs(vecX) + fastAbs(vecY)) + (vecX * vecX + vecY * vecY)
+
+                    distance1 = fastMax(fastMin(distance1, newDistance), distance0)
+                    if newDistance < distance0:
+                        distance0 = newDistance
+                        closestHash = hash
+                    yPrimed += PrimeY
+                xPrimed += PrimeX
+
+    if fnl.cellularDistanceFunction == FnlCellularDistanceFunction.Euclidean and 
+       fnl.cellularReturnType >= FnlCellularReturnType.Distance:
+        distance0 = fastSqrt(distance0)
+
+        if fnl.cellularReturnType >= FnlCellularReturnType.Distance2:
+            distance1 = fastSqrt(distance1)
+
+    case fnl.cellularReturnType:
+        of FnlCellularReturnType.CellValue:
+            result = closestHash.float * (1.0 / 2147483648.0)
+        of FnlCellularReturnType.Distance:
+            result = distance0 - 1.0
+        of FnlCellularReturnType.Distance2:
+            result = distance1 - 1.0
+        of FnlCellularReturnType.Distance2Add:
+            result = (distance1 + distance0) * 0.5 - 1.0
+        of FnlCellularReturnType.Distance2Sub:
+            result = distance1 - distance0 - 1.0
+        of FnlCellularReturnType.Distance2Mul:
+            result = distance1 * distance0 * 0.5 - 1.0
+        of FnlCellularReturnType.Distance2Div:
+            result = distance0 / distance1 - 1.0
+
+proc singleCellular(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
+    var xr = fastRound(x)
+    var yr = fastRound(y)
+    var zr = fastRound(z)
+
+    var distance0 = high(float)
+    var distance1 = high(float)
+    var closestHash = 0
+
+    let cellularJitter = 0.39614353 * fnl.cellularJitterModifier
+
+    var xPrimed = (xr - 1) * PrimeX
+    var yPrimedBase = (yr - 1) * PrimeY
+    var zPrimedBase = (zr - 1) * PrimeZ
+
+    case fnl.cellularDistanceFunction:
+        of FnlCellularDistanceFunction.Euclidean, FnlCellularDistanceFunction.EuclideanSq:
+            for xi in xr-1 .. xr+1:
+                var yPrimed = yPrimedBase
+
+                for yi in yr-1 .. yr+1:
+                    var zPrimed = zPrimedBase
+
+                    for zi in zr-1 .. zr+1:
+                        let hash = hash(seed, xPrimed, yPrimed, zPrimed)
+                        let idx = hash and (255 shl 2)
+
+                        let vecX = (xi.float - x).float + RandVecs3D[idx] * cellularJitter
+                        let vecY = (yi.float - y).float + RandVecs3D[idx or 1] * cellularJitter
+                        let vecZ = (zi.float - z).float + RandVecs3D[idx or 2] * cellularJitter
+
+                        let newDistance = vecX * vecX + vecY * vecY + vecZ * vecZ
+
+                        distance1 = fastMax(fastMin(distance1, newDistance), distance0)
+                        if newDistance < distance0:
+                            distance0 = newDistance
+                            closestHash = hash
+                        zPrimed += PrimeZ
+                    yPrimed += PrimeY
+                xPrimed += PrimeX
+        
+        of FnlCellularDistanceFunction.Manhattan:
+            for xi in xr-1 .. xr+1:
+                var yPrimed = yPrimedBase
+
+                for yi in yr-1 .. yr+1:
+                    var zPrimed = zPrimedBase
+
+                    for zi in zr-1 .. zr+1:
+                        let hash = hash(seed, xPrimed, yPrimed, zPrimed)
+                        let idx = hash and (255 shl 2)
+
+                        let vecX = (xi.float - x).float + RandVecs3D[idx] * cellularJitter
+                        let vecY = (yi.float - y).float + RandVecs3D[idx or 1] * cellularJitter
+                        let vecZ = (zi.float - z).float + RandVecs3D[idx or 2] * cellularJitter
+
+                        let newDistance = fastAbs(vecX) + fastAbs(vecY) + fastAbs(vecZ)
+
+                        distance1 = fastMax(fastMin(distance1, newDistance), distance0)
+                        if newDistance < distance0:
+                            distance0 = newDistance
+                            closestHash = hash
+                        zPrimed += PrimeZ
+                    yPrimed += PrimeY
+                xPrimed += PrimeX
+        
+        of FnlCellularDistanceFunction.Hybrid:
+            for xi in xr-1 .. xr+1:
+                var yPrimed = yPrimedBase
+
+                for yi in yr-1 .. yr+1:
+                    var zPrimed = zPrimedBase
+
+                    for zi in zr-1 .. zr+1:
+                        let hash = hash(seed, xPrimed, yPrimed, zPrimed)
+                        let idx = hash and (255 shl 2)
+
+                        let vecX = (xi.float - x).float + RandVecs3D[idx] * cellularJitter
+                        let vecY = (yi.float - y).float + RandVecs3D[idx or 1] * cellularJitter
+                        let vecZ = (zi.float - z).float + RandVecs3D[idx or 2] * cellularJitter
+
+                        let newDistance = (fastAbs(vecX) + fastAbs(vecY) + fastAbs(vecZ)) + 
+                                          (vecX * vecX + vecY * vecY + vecZ * vecZ)
+
+                        distance1 = fastMax(fastMin(distance1, newDistance), distance0)
+                        if newDistance < distance0:
+                            distance0 = newDistance
+                            closestHash = hash
+                        zPrimed += PrimeZ
+                    yPrimed += PrimeY
+                xPrimed += PrimeX
+
+    if fnl.cellularDistanceFunction == FnlCellularDistanceFunction.Euclidean and 
+       fnl.cellularReturnType >= FnlCellularReturnType.Distance:
+        distance0 = fastSqrt(distance0)
+
+        if fnl.cellularReturnType >= FnlCellularReturnType.Distance2:
+            distance1 = fastSqrt(distance1)
+
+    case fnl.cellularReturnType:
+        of FnlCellularReturnType.CellValue:
+            result = closestHash.float * (1.0 / 2147483648.0)
+        of FnlCellularReturnType.Distance:
+            result = distance0 - 1.0
+        of FnlCellularReturnType.Distance2:
+            result = distance1 - 1.0
+        of FnlCellularReturnType.Distance2Add:
+            result = (distance1 + distance0) * 0.5 - 1.0
+        of FnlCellularReturnType.Distance2Sub:
+            result = distance1 - distance0 - 1.0
+        of FnlCellularReturnType.Distance2Mul:
+            result = distance1 * distance0 * 0.5 - 1.0
+        of FnlCellularReturnType.Distance2Div:
+            result = distance0 / distance1 - 1.0
+
+proc singlePerlin(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat): float =
+    let x0 = fastFloor(x)
+    let y0 = fastFloor(y)
+
+    let xd0 = (x - x0.float).float
+    let yd0 = (y - y0.float).float
+    let xd1 = xd0 - 1.0
+    let yd1 = yd0 - 1.0
+
+    let xs = interpQuintic(xd0)
+    let ys = interpQuintic(yd0)
+
+    let x0p = x0 * PrimeX
+    let y0p = y0 * PrimeY
+    let x1p = x0p + PrimeX
+    let y1p = y0p + PrimeY
+
+    let xf0 = lerp(gradCoord(seed, x0p, y0p, xd0, yd0), gradCoord(seed, x1p, y0p, xd1, yd0), xs)
+    let xf1 = lerp(gradCoord(seed, x0p, y1p, xd0, yd1), gradCoord(seed, x1p, y1p, xd1, yd1), xs)
+
+    result = lerp(xf0, xf1, ys) * 1.4247691104677813
+
+proc singlePerlin(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
+    let x0 = fastFloor(x)
+    let y0 = fastFloor(y)
+    let z0 = fastFloor(z)
+
+    let xd0 = (x - x0.float).float
+    let yd0 = (y - y0.float).float
+    let zd0 = (z - z0.float).float
+    let xd1 = xd0 - 1.0
+    let yd1 = yd0 - 1.0
+    let zd1 = zd0 - 1.0
+
+    let xs = interpQuintic(xd0)
+    let ys = interpQuintic(yd0)
+    let zs = interpQuintic(zd0)
+
+    let x0p = x0 * PrimeX
+    let y0p = y0 * PrimeY
+    let z0p = z0 * PrimeZ
+    let x1p = x0p + PrimeX
+    let y1p = y0p + PrimeY
+    let z1p = z0p + PrimeZ
+
+    let xf00 = lerp(gradCoord(seed, x0p, y0p, z0p, xd0, yd0, zd0), 
+                     gradCoord(seed, x1p, y0p, z0p, xd1, yd0, zd0), xs)
+    let xf10 = lerp(gradCoord(seed, x0p, y1p, z0p, xd0, yd1, zd0), 
+                     gradCoord(seed, x1p, y1p, z0p, xd1, yd1, zd0), xs)
+    let xf01 = lerp(gradCoord(seed, x0p, y0p, z1p, xd0, yd0, zd1), 
+                     gradCoord(seed, x1p, y0p, z1p, xd1, yd0, zd1), xs)
+    let xf11 = lerp(gradCoord(seed, x0p, y1p, z1p, xd0, yd1, zd1), 
+                     gradCoord(seed, x1p, y1p, z1p, xd1, yd1, zd1), xs)
+
+    let yf0 = lerp(xf00, xf10, ys)
+    let yf1 = lerp(xf01, xf11, ys)
+
+    result = lerp(yf0, yf1, zs) * 0.964921414852142333984375
+
+proc singleValueCubic(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat): float =
+    let x1 = fastFloor(x)
+    let y1 = fastFloor(y)
+
+    let xs = (x - x1.float).float
+    let ys = (y - y1.float).float
+
+    let x1p = x1 * PrimeX
+    let y1p = y1 * PrimeY
+    let x0p = x1p - PrimeX
+    let y0p = y1p - PrimeY
+    let x2p = x1p + PrimeX
+    let y2p = y1p + PrimeY
+    let x3p = x1p + PrimeX * 2
+    let y3p = y1p + PrimeY * 2
+
+    result = cubicLerp(
+        cubicLerp(valCoord(seed, x0p, y0p), valCoord(seed, x1p, y0p), valCoord(seed, x2p, y0p), valCoord(seed, x3p, y0p), xs),
+        cubicLerp(valCoord(seed, x0p, y1p), valCoord(seed, x1p, y1p), valCoord(seed, x2p, y1p), valCoord(seed, x3p, y1p), xs),
+        cubicLerp(valCoord(seed, x0p, y2p), valCoord(seed, x1p, y2p), valCoord(seed, x2p, y2p), valCoord(seed, x3p, y2p), xs),
+        cubicLerp(valCoord(seed, x0p, y3p), valCoord(seed, x1p, y3p), valCoord(seed, x2p, y3p), valCoord(seed, x3p, y3p), xs),
+        ys) * (1.0 / (1.5 * 1.5))
+
+### value cubic
+
+proc singleValueCubic(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
+    return
+
+### value noise
+
+proc singleValue(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat): float =
+    return
+
+proc singleValue(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
+    return
+
+### domain warp handler
+
+proc doSingleDomainWarp(fnl: FnlNoise, seed: var int, amp: float, freq: float, x: var FnlFloat, y: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat): void =
+    return
+
+proc doSingleDomainWarp(fnl: FnlNoise, seed: var int, amp: float, freq: float, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat, zr: var FnlFloat): void =
+    return
+
+### domain warp singles
+
+proc domainWarpSingle(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
+    return
+
+proc domainWarpSingle(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): void =
+    return
+
+### domain warp fractal progressive
+
+proc domainWarpFractalProgressive(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
+    return
+
+proc domainWarpFractalProgressive(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): void =
+    return
+
+### domain warp fractal independent
+
+proc domainWarpFractalIndependent(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
+    return
+
+proc domainWarpFractalIndependent(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): void =
+    return
+
+### domain warp basic grid
+
+proc domainWarpBasicGrid(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: FnlFloat, y: FnlFloat, xr: FnlFloat, yr: FnlFloat): void = 
+    return
+
+proc domainWarpBasicGrid(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: FnlFloat, y: FnlFloat, z: FnlFloat, xr: FnlFloat, yr: FnlFloat, zr: FnlFloat): void = 
+    return
+
+### domain warp simplex/os2
+
+proc singleDomainWarpSimplexGradient(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: var FnlFloat, y: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat, outGradOnly: bool): void =
+    return
+
+proc singleDomainWarpSimplexGradient(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat, zr: var FnlFloat, outGradOnly: bool): void =
+    return
 
 
 proc setSeed*(fnl: var FnlNoise, seed: int) =
@@ -841,8 +1230,8 @@ proc setFrequency*(fnl: var FnlNoise, frequency: float) =
 proc setRotationType3D*(fnl: var FnlNoise, rotationType: FnlRotationType) =
     ## Set the rotation type for 3D noise types
     fnl.rotationType = rotationType
-    # updateTransformType(fnl)
-    # updateWarpTransformType(fnl)
+    updateTransformType(fnl)
+    updateWarpTransformType3D(fnl)
 
 proc setFractalType*(fnl: var FnlNoise, fractalType: FnlFractalType) =
     ## Set the fractal type
@@ -851,7 +1240,7 @@ proc setFractalType*(fnl: var FnlNoise, fractalType: FnlFractalType) =
 proc setOctaves*(fnl: var FnlNoise, octaves: int) =
     ## Set the number of octaves for fractal noise types
     fnl.octaves = octaves
-    # calculateFractalBounding(fnl)
+    calculateFractalBounding(fnl)
 
 proc setLacunarity*(fnl: var FnlNoise, lacunarity: float) =
     ## Set the lacunarity value for fractal noise types
@@ -860,7 +1249,7 @@ proc setLacunarity*(fnl: var FnlNoise, lacunarity: float) =
 proc setFractalGain*(fnl: var FnlNoise, gain: float) =
     ## Set the gain value for fractal noise types
     fnl.gain = gain
-    # calculateFractalBounding(fnl)
+    calculateFractalBounding(fnl)
 
 proc setFractalWeightedStrength*(fnl: var FnlNoise, weightedStrength: float) =
     ## Set the weighted strength value for fractal noise types
@@ -885,7 +1274,7 @@ proc setCellularJitterModifier*(fnl: var FnlNoise, cellularJitterModifier: float
 proc setDomainWarpType*(fnl: var FnlNoise, domainWarpType: FnlDomainWarpType) =
     ## Set the domain warp type
     fnl.domainWarpType = domainWarpType
-    # updateWarpTransformType(fnl)
+    updateWarpTransformType3D(fnl)
 
 proc setDomainWarpAmp*(fnl: var FnlNoise, domainWarpAmp: float) =
     ## Set the domain warp amplitude
@@ -894,4 +1283,203 @@ proc setDomainWarpAmp*(fnl: var FnlNoise, domainWarpAmp: float) =
 proc setNoiseType*(fnl: var FnlNoise, noiseType: FnlNoiseType) =
     ## Set the noise type
     fnl.noiseType = noiseType
-    # updateTransformType(fnl)
+    updateTransformType(fnl)
+
+
+### Template function names here for the moment until I finish implemnting them all
+proc genNoiseSingle(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat): float =
+    case fnl.noiseType
+        of FnlNoiseType.OpenSimplex2:
+            result = singleSimplex(fnl, seed, x, y)
+        of FnlNoiseType.OpenSimplex2S:
+            result = singleOpenSimplex2S(fnl, seed, x, y)
+        of FnlNoiseType.Cellular:
+            result = singleCellular(fnl, seed, x, y)
+        of FnlNoiseType.Perlin:
+            result = singlePerlin(fnl, seed, x, y)
+        of FnlNoiseType.ValueCubic:
+            result = singleValueCubic(fnl, seed, x, y)
+        of FnlNoiseType.Value:
+            result = singleValue(fnl, seed, x, y)
+        else:
+            result = 0.0
+
+proc genNoiseSingle(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
+    case fnl.noiseType
+        of FnlNoiseType.OpenSimplex2:
+            result = singleOpenSimplex2(fnl, seed, x, y, z)
+        of FnlNoiseType.OpenSimplex2S:
+            result = singleOpenSimplex2S(fnl, seed, x, y, z)
+        of FnlNoiseType.Cellular:
+            result = singleCellular(fnl, seed, x, y, z)
+        of FnlNoiseType.Perlin:
+            result = singlePerlin(fnl, seed, x, y, z)
+        of FnlNoiseType.ValueCubic:
+            result = singleValueCubic(fnl, seed, x, y, z)
+        of FnlNoiseType.Value:
+            result = singleValue(fnl, seed, x, y, z)
+        else:
+            result = 0.0
+
+### fractal FBm
+
+proc genFractalFBm(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): float =
+    var seed = fnl.seed
+    var sum: float = 0.0
+    var amp = fnl.fractalBounding
+
+    for i in 0 ..< fnl.octaves:
+        seed += 1
+        var noise = genNoiseSingle(fnl, seed, x, y)
+        sum += noise * amp
+        amp *= lerp(1.0, fastMin(noise + 1, 2) * 0.5, fnl.weightedStrength)
+
+        x = x * fnl.lacunarity
+        y = y * fnl.lacunarity
+        amp *= fnl.gain
+    
+    result = sum
+
+proc genFractalFBm(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
+    var seed = fnl.seed
+    var sum: float = 0.0
+    var amp = fnl.fractalBounding
+
+    for i in 0 ..< fnl.octaves:
+        seed += 1
+        var noise = genNoiseSingle(fnl, seed, x, y, z)
+        sum += noise * amp
+        amp *= lerp(1.0, (noise + 1) * 0.5, fnl.weightedStrength)
+
+        x = x * fnl.lacunarity
+        y = y * fnl.lacunarity
+        z = z * fnl.lacunarity
+        amp *= fnl.gain
+    
+    result = sum
+
+### fractal Ridged
+
+proc genFractalRidged(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): float =
+    var seed = fnl.seed
+    var sum: float = 0.0
+    var amp = fnl.fractalBounding
+
+    for i in 0 ..< fnl.octaves:
+        seed += 1
+        var noise = fastAbs(genNoiseSingle(fnl, seed, x, y))
+        sum += (noise * -2 + 1) * amp
+        amp *= lerp(1.0, 1 - noise, fnl.weightedStrength)
+
+        x = x * fnl.lacunarity
+        y = y * fnl.lacunarity
+        amp *= fnl.gain
+    
+    result = sum
+
+proc genFractalRidged(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
+    var seed = fnl.seed
+    var sum: float = 0.0
+    var amp = fnl.fractalBounding
+
+    for i in 0 ..< fnl.octaves:
+        seed += 1
+        var noise = fastAbs(genNoiseSingle(fnl, seed, x, y, z))
+        sum += (noise * -2 + 1) * amp
+        amp *= lerp(1.0, 1 - noise, fnl.weightedStrength)
+
+        x = x * fnl.lacunarity
+        y = y * fnl.lacunarity
+        z = z * fnl.lacunarity
+        amp *= fnl.gain
+    
+    result = sum
+
+### fractal PingPong
+
+proc genFractalPingPong(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): float =
+    var seed = fnl.seed
+    var sum: float = 0.0
+    var amp = fnl.fractalBounding
+
+    for i in 0 ..< fnl.octaves:
+        seed += 1
+        var n1 = genNoiseSingle(fnl, seed, x, y) + 1 * fnl.pingPongStrength
+        var noise = pingPong(n1)
+        sum += (noise - 0.5) * 2 * amp
+        amp *= lerp(1.0, noise, fnl.weightedStrength)
+
+        x = x * fnl.lacunarity
+        y = y * fnl.lacunarity
+        amp *= fnl.gain
+    
+    result = sum
+
+proc genFractalPingPong(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
+    var seed = fnl.seed
+    var sum: float = 0.0
+    var amp = fnl.fractalBounding
+
+    for i in 0 ..< fnl.octaves:
+        seed += 1
+        var n1 = genNoiseSingle(fnl, seed, x, y, z) + 1 * fnl.pingPongStrength
+        var noise = pingPong(n1)
+        sum += (noise - 0.5) * 2 * amp
+        amp *= lerp(1.0, noise, fnl.weightedStrength)
+
+        x = x * fnl.lacunarity
+        y = y * fnl.lacunarity
+        z = z * fnl.lacunarity
+        amp *= fnl.gain
+    
+    result = sum
+
+
+proc getNoise*(fnl: var FnlNoise, x: FnlFloat, y: FnlFloat): float =
+    var vx = x
+    var vy = y
+    transformNoiseCoordinate(fnl, vx, vy)
+
+    case fnl.fractalType:
+        of FnlFractalType.FBm:
+            result = genFractalFBm(fnl, vx, vy)
+        of FnlFractalType.Ridged:
+            result = genFractalRidged(fnl, vx, vy)
+        of FnlFractalType.PingPong:
+            result = genFractalPingPong(fnl, vx, vy)
+        else:
+            result = genNoiseSingle(fnl, fnl.seed, vx, vy)
+
+proc getNoise*(fnl: var FnlNoise, x: FnlFloat, y: FnlFloat, z: FnlFloat): float =
+    var vx = x
+    var vy = y
+    var vz = z
+    transformNoiseCoordinate(fnl, vx, vy, vz)
+
+    case fnl.fractalType:
+        of FnlFractalType.FBm:
+            result = genFractalFBm(fnl, vx, vy, vz)
+        of FnlFractalType.Ridged:
+            result = genFractalRidged(fnl, vx, vy, vz)
+        of FnlFractalType.PingPong:
+            result = genFractalPingPong(fnl, vx, vy, vz)
+        else:
+            result = genNoiseSingle(fnl, fnl.seed, vx, vy, vz)
+    
+proc domainWarp*(fnl: var FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
+    case fnl.fractalType:
+        of FnlFractalType.DomainWarpProgressive:
+            domainWarpFractalProgressive(fnl, x, y)
+        of FnlFractalType.DomainWarpIndependent:
+            domainWarpFractalIndependent(fnl, x, y)
+        else:
+            domainWarpSingle(fnl, x, y)
+
+proc domainWarp*(fnl: var FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): void =
+    case fnl.fractalType:
+        of FnlFractalType.DomainWarpProgressive:
+            domainWarpFractalProgressive(fnl, x, y, z)
+        of FnlFractalType.DomainWarpIndependent:
+            domainWarpFractalIndependent(fnl, x, y, z)
+        else:
+            domainWarpSingle(fnl, x, y, z)

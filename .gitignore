@@ -7,3 +7,6 @@ nimcache/
 *.so
 
 tst/*
+
+*.cs
+!fnlMissing.cs
