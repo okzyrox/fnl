@@ -6,7 +6,4 @@ nimcache/
 *.dll
 *.so
 
-tst/*
-
 *.cs
-!fnlMissing.cs

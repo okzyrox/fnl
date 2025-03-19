@@ -2,7 +2,7 @@
 
 import std/[math]
 
-type FnlFloat = float32 # float64
+type FnlFloat = float32 # alternate to float64
 
 type FnlNoiseType* = enum
     OpenSimplex2
@@ -277,16 +277,23 @@ proc calculateFractalBounding(fnl: var FnlNoise) =
     fnl.fractalBounding = 1 / ampFractal
 
 proc hash(seed: int, xPrimed: int, yPrimed: int): int =
-    var hash = seed ^ xPrimed ^ yPrimed
+    var hash = seed
+    hash = hash xor xPrimed
+    hash = hash xor yPrimed
     
-    hash *= 0x27d4eb2d
+    # overflow stuff
+    hash = (hash * 0x27d4eb2d) and 0x7FFFFFFF
     
     result = hash
 
 proc hash(seed: int, xPrimed: int, yPrimed: int, zPrimed: int): int =
-    var hash = seed ^ xPrimed ^ yPrimed ^ zPrimed
+    var hash = seed
+    hash = hash xor xPrimed
+    hash = hash xor yPrimed
+    hash = hash xor zPrimed
     
-    hash *= 0x27d4eb2d
+    # overflow stuff
+    hash = (hash * 0x27d4eb2d) and 0x7FFFFFFF
     
     result = hash
 
@@ -314,67 +321,68 @@ proc valCoord(seed: int, xPrimed: int, yPrimed: int, zPrimed: int): float =
 
 proc gradCoord(seed: int, xPrimed: int, yPrimed: int, xd: float, yd: float): float =
     var hash = hash(seed, xPrimed, yPrimed)
-    hash = (hash ^ hash) shr 15
-    hash = hash and 127 shl 1
-
-    let xg = Gradients2D[hash]
-    let yg = Gradients2D[hash or 1]
-
+    hash = (hash xor (hash shr 15)) and 127 # Fix: bitwise AND with 127 instead of shl
+    
+    let xg = Gradients2D[hash * 2]
+    let yg = Gradients2D[hash * 2 + 1]
+    
     result = xd * xg + yd * yg
 
 proc gradCoord(seed: int, xPrimed: int, yPrimed: int, zPrimed: int, xd: float, yd: float, zd: float): float =
     var hash = hash(seed, xPrimed, yPrimed, zPrimed)
-    hash = (hash ^ hash) shr 15
-    hash = hash and 63 shl 2
-
-    let xg = Gradients3D[hash].float
-    let yg = Gradients3D[hash or 1].float
-    let zg = Gradients3D[hash or 2].float
-
+    hash = (hash xor (hash shr 15)) and 63 # Fix: bitwise AND with 63 instead of shl
+    
+    let xg = Gradients3D[hash * 4].float
+    let yg = Gradients3D[hash * 4 + 1].float
+    let zg = Gradients3D[hash * 4 + 2].float
+    
     result = xd * xg + yd * yg + zd * zg
 
 proc gradCoordOut(seed: int, xPrimed: int, yPrimed: int, xo: var float, yo: var float): void = 
-    var hash = hash(seed, xPrimed, yPrimed) and 255 shl 1
-
-    xo = RandVecs2D[hash]
-    yo = RandVecs2D[hash or 1]
+    var hash = hash(seed, xPrimed, yPrimed) and 255
+    
+    xo = RandVecs2D[hash * 2]
+    yo = RandVecs2D[hash * 2 + 1]
 
 proc gradCoordOut(seed: int, xPrimed: int, yPrimed: int, zPrimed: int, xo: var float, yo: var float, zo: var float): void =
-    var hash = hash(seed, xPrimed, yPrimed, zPrimed) and 255 shl 2
-
-    xo = RandVecs3D[hash]
-    yo = RandVecs3D[hash or 1]
-    zo = RandVecs3D[hash or 2]
+    var hash = hash(seed, xPrimed, yPrimed, zPrimed) and 255
+    
+    xo = RandVecs3D[hash * 4]
+    yo = RandVecs3D[hash * 4 + 1]
+    zo = RandVecs3D[hash * 4 + 2]
 
 proc gradCoordDual(seed: int, xPrimed: int, yPrimed: int, xd: float, yd: float, xo: var float, yo: var float): void =
     let hash = hash(seed, xPrimed, yPrimed)
-    let index1 = hash and (127 shl 1)
-    let index2 = (hash shr 7) and (255 shl 1)
-
-    let xg = Gradients2D[index1]
-    let yg = Gradients2D[index1 or 1]
+    let index1 = hash and 127
+    let index2 = (hash shr 7) and 255
+    
+    let idx1 = (index1 * 2) and 0xFF
+    let idx2 = (index2 * 2) and 0xFF
+    
+    let xg = Gradients2D[idx1]
+    let yg = Gradients2D[idx1 + 1]
     let val = xd * xg + yd * yg
-
-    let xgo = RandVecs2D[index2]
-    let ygo = RandVecs2D[index2 or 1]
-
+    
+    let xgo = RandVecs2D[idx2]
+    let ygo = RandVecs2D[idx2 + 1]
+    
     xo = val * xgo
     yo = val * ygo
 
 proc gradCoordDual(seed: int, xPrimed: int, yPrimed: int, zPrimed: int, xd: float, yd: float, zd: float, xo: var float, yo: var float, zo: var float): void =
     let hash = hash(seed, xPrimed, yPrimed, zPrimed)
-    let index1 = hash and (63 shl 2)
-    let index2 = (hash shr 6) and (255 shl 2)
-
-    let xg = Gradients3D[index1].float
-    let yg = Gradients3D[index1 or 1].float
-    let zg = Gradients3D[index1 or 2].float
+    let index1 = hash and 63
+    let index2 = (hash shr 6) and 255
+    
+    let xg = Gradients3D[index1 * 4].float
+    let yg = Gradients3D[index1 * 4 + 1].float
+    let zg = Gradients3D[index1 * 4 + 2].float
     let val = xd * xg + yd * yg + zd * zg
-
-    let xgo = RandVecs3D[index2]
-    let ygo = RandVecs3D[index2 or 1]
-    let zgo = RandVecs3D[index2 or 2]
-
+    
+    let xgo = RandVecs3D[index2 * 4]
+    let ygo = RandVecs3D[index2 * 4 + 1]
+    let zgo = RandVecs3D[index2 * 4 + 2]
+    
     xo = val * xgo
     yo = val * ygo
     zo = val * zgo
@@ -391,8 +399,9 @@ proc transformNoiseCoordinate(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): 
 
     case fnl.noiseType:
         of FnlNoiseType.OpenSimplex2, FnlNoiseType.OpenSimplex2S:
-            const Sqrt3: FnlFloat = 1.7320508075688772935274463415059
-            const F2: FnlFloat = 0.5 * (Sqrt3 - 1)
+            const 
+                SQRT3: FnlFloat = 1.7320508075688772935274463415059
+                F2: FnlFloat = 0.5 * (SQRT3 - 1)
             let t = (x + y) * F2
             x += t
             y += t  
@@ -421,7 +430,8 @@ proc transformNoiseCoordinate(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z
             z += s2 - y
             y += xz * FnlFloat(0.577350269189626)
         of FnlTransformType.DefaultOpenSimplex2:
-            const R3: FnlFloat = FnlFloat(2.0 / 3.0)
+            const 
+                R3: FnlFloat = FnlFloat(2.0 / 3.0)
             let r = (x + y + z) * R3
             x = r - x
             y = r - y
@@ -447,8 +457,9 @@ proc updateTransformType(fnl: var FnlNoise) =
 proc transformDomainWarpCoordinate(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
     case fnl.domainWarpType:
         of FnlDomainWarpType.OpenSimplex2:
-            const Sqrt3: FnlFloat = 1.7320508075688772935274463415059
-            const F2: FnlFloat = 0.5 * (Sqrt3 - 1)
+            const 
+                SQRT3: FnlFloat = 1.7320508075688772935274463415059
+                F2: FnlFloat = 0.5 * (SQRT3 - 1)
             let t = (x + y) * F2
             x += t
             y += t
@@ -473,7 +484,8 @@ proc transformDomainWarpCoordinate(fnl: FnlNoise, x: var FnlFloat, y: var FnlFlo
             y += xz * FnlFloat(0.577350269189626)
         
         of FnlTransformType.DefaultOpenSimplex2:
-            const R3: FnlFloat = FnlFloat(2.0 / 3.0)
+            const 
+                R3: FnlFloat = FnlFloat(2.0 / 3.0)
             let r = (x + y + z) * R3
             x = r - x
             y = r - y
@@ -607,19 +619,19 @@ proc singleOpenSimplex2(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var Fn
         ay0 = 0.5 - ay0
         az0 = 0.5 - az0
 
-        y0 = xNsign.float * ax0
-        z0 = yNsign.float * ay0
-        x0 = zNsign.float * az0
+        x0 = xNSign.float * ax0
+        y0 = yNSign.float * ay0
+        z0 = zNSign.float * az0
 
-        a += (0.75 - ax0) - (ax0 + az0)
+        a += (0.75 - ax0) - (ay0 + az0)
 
-        i += (xNsign shr 1) and PrimeX
-        j += (yNsign shr 1) and PrimeY
-        k += (zNsign shr 1) and PrimeZ
+        i += (xNSign shr 1) and (PrimeX and 0x7FFFFFFF)
+        j += (yNSign shr 1) and (PrimeY and 0x7FFFFFFF)
+        k += (zNSign shr 1) and (PrimeZ and 0x7FFFFFFF)
 
-        xnSign = -xNsign
-        xNsign = -yNsign
-        yNsign = -zNsign
+        xNSign = -xNSign
+        yNSign = -yNSign
+        zNSign = -zNSign
 
         seed = not(seed)
 
@@ -1134,6 +1146,8 @@ proc singlePerlin(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat
 
     result = lerp(yf0, yf1, zs) * 0.964921414852142333984375
 
+### value cubic
+
 proc singleValueCubic(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat): float =
     let x1 = fastFloor(x)
     let y1 = fastFloor(y)
@@ -1157,66 +1171,493 @@ proc singleValueCubic(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlF
         cubicLerp(valCoord(seed, x0p, y3p), valCoord(seed, x1p, y3p), valCoord(seed, x2p, y3p), valCoord(seed, x3p, y3p), xs),
         ys) * (1.0 / (1.5 * 1.5))
 
-### value cubic
 
 proc singleValueCubic(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
-    return
+    let x1 = fastFloor(x)
+    let y1 = fastFloor(y)
+    let z1 = fastFloor(z)
+
+    let xs = (x - x1.float).float
+    let ys = (y - y1.float).float
+    let zs = (z - z1.float).float
+
+    let x1p = x1 * PrimeX
+    let y1p = y1 * PrimeY
+    let z1p = z1 * PrimeZ
+
+    let x0p = x1p - PrimeX
+    let y0p = y1p - PrimeY
+    let z0p = z1p - PrimeZ
+    let x2p = x1p + PrimeX
+    let y2p = y1p + PrimeY
+    let z2p = z1p + PrimeZ
+    let x3p = x1p + PrimeX * 2
+    let y3p = y1p + PrimeY * 2
+    let z3p = z1p + PrimeZ * 2
+
+    result = cubicLerp(
+        cubicLerp(
+            cubicLerp(valCoord(seed, x0p, y0p, z0p), valCoord(seed, x1p, y0p, z0p), valCoord(seed, x2p, y0p, z0p), valCoord(seed, x3p, y0p, z0p), xs),
+            cubicLerp(valCoord(seed, x0p, y1p, z0p), valCoord(seed, x1p, y1p, z0p), valCoord(seed, x2p, y1p, z0p), valCoord(seed, x3p, y1p, z0p), xs),
+            cubicLerp(valCoord(seed, x0p, y2p, z0p), valCoord(seed, x1p, y2p, z0p), valCoord(seed, x2p, y2p, z0p), valCoord(seed, x3p, y2p, z0p), xs),
+            cubicLerp(valCoord(seed, x0p, y3p, z0p), valCoord(seed, x1p, y3p, z0p), valCoord(seed, x2p, y3p, z0p), valCoord(seed, x3p, y3p, z0p), xs),
+            ys),
+        cubicLerp(
+            cubicLerp(valCoord(seed, x0p, y0p, z1p), valCoord(seed, x1p, y0p, z1p), valCoord(seed, x2p, y0p, z1p), valCoord(seed, x3p, y0p, z1p), xs),
+            cubicLerp(valCoord(seed, x0p, y1p, z1p), valCoord(seed, x1p, y1p, z1p), valCoord(seed, x2p, y1p, z1p), valCoord(seed, x3p, y1p, z1p), xs),
+            cubicLerp(valCoord(seed, x0p, y2p, z1p), valCoord(seed, x1p, y2p, z1p), valCoord(seed, x2p, y2p, z1p), valCoord(seed, x3p, y2p, z1p), xs),
+            cubicLerp(valCoord(seed, x0p, y3p, z1p), valCoord(seed, x1p, y3p, z1p), valCoord(seed, x2p, y3p, z1p), valCoord(seed, x3p, y3p, z1p), xs),
+            ys),
+        cubicLerp(
+            cubicLerp(valCoord(seed, x0p, y0p, z2p), valCoord(seed, x1p, y0p, z2p), valCoord(seed, x2p, y0p, z2p), valCoord(seed, x3p, y0p, z2p), xs),
+            cubicLerp(valCoord(seed, x0p, y1p, z2p), valCoord(seed, x1p, y1p, z2p), valCoord(seed, x2p, y1p, z2p), valCoord(seed, x3p, y1p, z2p), xs),
+            cubicLerp(valCoord(seed, x0p, y2p, z2p), valCoord(seed, x1p, y2p, z2p), valCoord(seed, x2p, y2p, z2p), valCoord(seed, x3p, y2p, z2p), xs),
+            cubicLerp(valCoord(seed, x0p, y3p, z2p), valCoord(seed, x1p, y3p, z2p), valCoord(seed, x2p, y3p, z2p), valCoord(seed, x3p, y3p, z2p), xs),
+            ys),
+        cubicLerp(
+            cubicLerp(valCoord(seed, x0p, y0p, z3p), valCoord(seed, x1p, y0p, z3p), valCoord(seed, x2p, y0p, z3p), valCoord(seed, x3p, y0p, z3p), xs),
+            cubicLerp(valCoord(seed, x0p, y1p, z3p), valCoord(seed, x1p, y1p, z3p), valCoord(seed, x2p, y1p, z3p), valCoord(seed, x3p, y1p, z3p), xs),
+            cubicLerp(valCoord(seed, x0p, y2p, z3p), valCoord(seed, x1p, y2p, z3p), valCoord(seed, x2p, y2p, z3p), valCoord(seed, x3p, y2p, z3p), xs),
+            cubicLerp(valCoord(seed, x0p, y3p, z3p), valCoord(seed, x1p, y3p, z3p), valCoord(seed, x2p, y3p, z3p), valCoord(seed, x3p, y3p, z3p), xs),
+            ys),
+        zs) * (1.0 / (1.5 * 1.5 * 1.5))
 
 ### value noise
 
 proc singleValue(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat): float =
-    return
+    let x0 = fastFloor(x)
+    let y0 = fastFloor(y)
+
+    let xs = interpHermite((x - x0.float).float)
+    let ys = interpHermite((y - y0.float).float)
+
+    let x0p = x0 * PrimeX
+    let y0p = y0 * PrimeY
+    let x1p = x0p + PrimeX
+    let y1p = y0p + PrimeY
+
+    let xf0 = lerp(valCoord(seed, x0p, y0p), valCoord(seed, x1p, y0p), xs)
+    let xf1 = lerp(valCoord(seed, x0p, y1p), valCoord(seed, x1p, y1p), xs)
+
+    result = lerp(xf0, xf1, ys)
 
 proc singleValue(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
-    return
+    let x0 = fastFloor(x)
+    let y0 = fastFloor(y)
+    let z0 = fastFloor(z)
+
+    let xs = interpHermite((x - x0.float).float)
+    let ys = interpHermite((y - y0.float).float)
+    let zs = interpHermite((z - z0.float).float)
+
+    let x0p = x0 * PrimeX
+    let y0p = y0 * PrimeY
+    let z0p = z0 * PrimeZ
+    let x1p = x0p + PrimeX
+    let y1p = y0p + PrimeY
+    let z1p = z0p + PrimeZ
+
+    let xf00 = lerp(valCoord(seed, x0p, y0p, z0p), valCoord(seed, x1p, y0p, z0p), xs)
+    let xf10 = lerp(valCoord(seed, x0p, y1p, z0p), valCoord(seed, x1p, y1p, z0p), xs)
+    let xf01 = lerp(valCoord(seed, x0p, y0p, z1p), valCoord(seed, x1p, y0p, z1p), xs)
+    let xf11 = lerp(valCoord(seed, x0p, y1p, z1p), valCoord(seed, x1p, y1p, z1p), xs)
+
+    let yf0 = lerp(xf00, xf10, ys)
+    let yf1 = lerp(xf01, xf11, ys)
+
+    result = lerp(yf0, yf1, zs)
 
 ### domain warp handler
 
+proc singleDomainWarpSimplexGradient(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: var FnlFloat, y: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat, outGradOnly: bool): void
+proc singleDomainWarpSimplexGradient(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat, zr: var FnlFloat, outGradOnly: bool): void
+
+proc domainWarpBasicGrid(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: FnlFloat, y: FnlFloat, xr: var FnlFloat, yr: var FnlFloat): void
+proc domainWarpBasicGrid(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: FnlFloat, y: FnlFloat, z: FnlFloat, xr: var FnlFloat, yr: var FnlFloat, zr: var FnlFloat): void
+
 proc doSingleDomainWarp(fnl: FnlNoise, seed: var int, amp: float, freq: float, x: var FnlFloat, y: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat): void =
-    return
+    case fnl.domainWarpType:
+        of FnlDomainWarpType.OpenSimplex2:
+            singleDomainWarpSimplexGradient(fnl, seed, amp * 38.283687591552734375, freq, x, y, xr, yr, false)
+        of FnlDomainWarpType.OpenSimplex2Reduced:
+            singleDomainWarpSimplexGradient(fnl, seed, amp * 16.0, freq, x, y, xr, yr, true)
+        of FnlDomainWarpType.BasicGrid:
+            domainWarpBasicGrid(fnl, seed, amp, freq, x, y, xr, yr)
 
 proc doSingleDomainWarp(fnl: FnlNoise, seed: var int, amp: float, freq: float, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat, zr: var FnlFloat): void =
-    return
+    case fnl.domainWarpType:
+        of FnlDomainWarpType.OpenSimplex2:
+            singleDomainWarpSimplexGradient(fnl, seed, amp * 32.69428253173828125, freq, x, y, z, xr, yr, zr, false)
+        of FnlDomainWarpType.OpenSimplex2Reduced:
+            singleDomainWarpSimplexGradient(fnl, seed, amp * 7.71604938271605, freq, x, y, z, xr, yr, zr, true)
+        of FnlDomainWarpType.BasicGrid:
+            domainWarpBasicGrid(fnl, seed, amp, freq, x, y, z, xr, yr, zr)
 
 ### domain warp singles
 
 proc domainWarpSingle(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
-    return
+    var seed = fnl.seed
+    let amp = fnl.domainWarpAmp * fnl.fractalBounding
+    let freq = fnl.frequency
+    
+    var xs = x
+    var ys = y
+    transformDomainWarpCoordinate(fnl, xs, ys)
+    
+    doSingleDomainWarp(fnl, seed, amp, freq, xs, ys, x, y)
 
 proc domainWarpSingle(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): void =
-    return
+    var seed = fnl.seed
+    let amp = fnl.domainWarpAmp * fnl.fractalBounding
+    let freq = fnl.frequency
+    
+    var xs = x
+    var ys = y
+    var zs = z
+    transformDomainWarpCoordinate(fnl, xs, ys, zs)
+    
+    doSingleDomainWarp(fnl, seed, amp, freq, xs, ys, zs, x, y, z)
 
 ### domain warp fractal progressive
 
 proc domainWarpFractalProgressive(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
-    return
+    var seed = fnl.seed
+    var amp = fnl.domainWarpAmp * fnl.fractalBounding
+    var freq = fnl.frequency
+    
+    for i in 0 ..< fnl.octaves:
+        var xs = x
+        var ys = y
+        transformDomainWarpCoordinate(fnl, xs, ys)
+        
+        doSingleDomainWarp(fnl, seed, amp, freq, xs, ys, x, y)
+        
+        seed += 1
+        amp *= fnl.gain
+        freq *= fnl.lacunarity
 
 proc domainWarpFractalProgressive(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): void =
-    return
+    var seed = fnl.seed
+    var amp = fnl.domainWarpAmp * fnl.fractalBounding
+    var freq = fnl.frequency
+    
+    for i in 0 ..< fnl.octaves:
+        var xs = x
+        var ys = y
+        var zs = z
+        transformDomainWarpCoordinate(fnl, xs, ys, zs)
+        
+        doSingleDomainWarp(fnl, seed, amp, freq, xs, ys, zs, x, y, z)
+        
+        seed += 1
+        amp *= fnl.gain
+        freq *= fnl.lacunarity
 
 ### domain warp fractal independent
 
 proc domainWarpFractalIndependent(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
-    return
+    var xs = x
+    var ys = y
+    transformDomainWarpCoordinate(fnl, xs, ys)
+    
+    var seed = fnl.seed
+    var amp = fnl.domainWarpAmp * fnl.fractalBounding
+    var freq = fnl.frequency
+    
+    for i in 0 ..< fnl.octaves:
+        doSingleDomainWarp(fnl, seed, amp, freq, xs, ys, x, y)
+        
+        seed += 1
+        amp *= fnl.gain
+        freq *= fnl.lacunarity
 
 proc domainWarpFractalIndependent(fnl: FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): void =
-    return
+    var xs = x
+    var ys = y
+    var zs = z
+    transformDomainWarpCoordinate(fnl, xs, ys, zs)
+    
+    var seed = fnl.seed
+    var amp = fnl.domainWarpAmp * fnl.fractalBounding
+    var freq = fnl.frequency
+    
+    for i in 0 ..< fnl.octaves:
+        doSingleDomainWarp(fnl, seed, amp, freq, xs, ys, zs, x, y, z)
+        
+        seed += 1
+        amp *= fnl.gain
+        freq *= fnl.lacunarity
 
 ### domain warp basic grid
 
-proc domainWarpBasicGrid(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: FnlFloat, y: FnlFloat, xr: FnlFloat, yr: FnlFloat): void = 
-    return
+proc domainWarpBasicGrid(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: FnlFloat, y: FnlFloat, xr: var FnlFloat, yr: var FnlFloat): void = 
+    let xf = x * frequency
+    let yf = y * frequency
+    
+    let x0 = fastFloor(xf)
+    let y0 = fastFloor(yf)
+    
+    let xs = interpHermite((xf - x0.float).float)
+    let ys = interpHermite((yf - y0.float).float)
+    
+    let x0p = x0 * PrimeX
+    let y0p = y0 * PrimeY
+    let x1p = x0p + PrimeX
+    let y1p = y0p + PrimeY
+    
+    var hash0 = hash(seed, x0p, y0p) and 255
+    var hash1 = hash(seed, x1p, y0p) and 255
+    
+    let lx0x = lerp(RandVecs2D[hash0 * 2], RandVecs2D[hash1 * 2], xs)
+    let ly0x = lerp(RandVecs2D[hash0 * 2 + 1], RandVecs2D[hash1 * 2 + 1], xs)
+    
+    hash0 = hash(seed, x0p, y1p) and 255
+    hash1 = hash(seed, x1p, y1p) and 255
+    
+    let lx1x = lerp(RandVecs2D[hash0 * 2], RandVecs2D[hash1 * 2], xs)
+    let ly1x = lerp(RandVecs2D[hash0 * 2 + 1], RandVecs2D[hash1 * 2 + 1], xs)
+    
+    xr += lerp(lx0x, lx1x, ys) * warpAmp
+    yr += lerp(ly0x, ly1x, ys) * warpAmp
 
-proc domainWarpBasicGrid(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: FnlFloat, y: FnlFloat, z: FnlFloat, xr: FnlFloat, yr: FnlFloat, zr: FnlFloat): void = 
-    return
+proc domainWarpBasicGrid(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: FnlFloat, y: FnlFloat, z: FnlFloat, xr: var FnlFloat, yr: var FnlFloat, zr: var FnlFloat): void = 
+    let xf = x * frequency
+    let yf = y * frequency
+    let zf = z * frequency
+    
+    let x0 = fastFloor(xf)
+    let y0 = fastFloor(yf)
+    let z0 = fastFloor(zf)
+    
+    let xs = interpHermite((xf - x0.float).float)
+    let ys = interpHermite((yf - y0.float).float)
+    let zs = interpHermite((zf - z0.float).float)
+    
+    let x0p = x0 * PrimeX
+    let y0p = y0 * PrimeY
+    let z0p = z0 * PrimeZ
+    let x1p = x0p + PrimeX
+    let y1p = y0p + PrimeY
+    let z1p = z0p + PrimeZ
+    
+    var hash0 = hash(seed, x0p, y0p, z0p) and 255
+    var hash1 = hash(seed, x1p, y0p, z0p) and 255
+    
+    let lx0x = lerp(RandVecs3D[hash0 * 4], RandVecs3D[hash1 * 4], xs)
+    let ly0x = lerp(RandVecs3D[hash0 * 4 + 1], RandVecs3D[hash1 * 4 + 1], xs)
+    let lz0x = lerp(RandVecs3D[hash0 * 4 + 2], RandVecs3D[hash1 * 4 + 2], xs)
+    
+    hash0 = hash(seed, x0p, y1p, z0p) and 255
+    hash1 = hash(seed, x1p, y1p, z0p) and 255
+    
+    let lx1x = lerp(RandVecs3D[hash0 * 4], RandVecs3D[hash1 * 4], xs)
+    let ly1x = lerp(RandVecs3D[hash0 * 4 + 1], RandVecs3D[hash1 * 4 + 1], xs)
+    let lz1x = lerp(RandVecs3D[hash0 * 4 + 2], RandVecs3D[hash1 * 4 + 2], xs)
+    
+    let lx0y = lerp(lx0x, lx1x, ys)
+    let ly0y = lerp(ly0x, ly1x, ys)
+    let lz0y = lerp(lz0x, lz1x, ys)
+    
+    hash0 = hash(seed, x0p, y0p, z1p) and (255 shl 2)
+    hash1 = hash(seed, x1p, y0p, z1p) and (255 shl 2)
+    
+    var lx0z = lerp(RandVecs3D[hash0], RandVecs3D[hash1], xs)
+    var ly0z = lerp(RandVecs3D[hash0 or 1], RandVecs3D[hash1 or 1], xs)
+    var lz0z = lerp(RandVecs3D[hash0 or 2], RandVecs3D[hash1 or 2], xs)
+    
+    hash0 = hash(seed, x0p, y1p, z1p) and (255 shl 2)
+    hash1 = hash(seed, x1p, y1p, z1p) and (255 shl 2)
+    
+    var lx1z = lerp(RandVecs3D[hash0], RandVecs3D[hash1], xs)
+    var ly1z = lerp(RandVecs3D[hash0 or 1], RandVecs3D[hash1 or 1], xs)
+    var lz1z = lerp(RandVecs3D[hash0 or 2], RandVecs3D[hash1 or 2], xs)
+    
+    xr += lerp(lx0y, lerp(lx0z, lx1z, ys), zs) * warpAmp
+    yr += lerp(ly0y, lerp(ly0z, ly1z, ys), zs) * warpAmp
+    zr += lerp(lz0y, lerp(lz0z, lz1z, ys), zs) * warpAmp
 
 ### domain warp simplex/os2
 
 proc singleDomainWarpSimplexGradient(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: var FnlFloat, y: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat, outGradOnly: bool): void =
-    return
+    const 
+        SQRT3 = 1.7320508075688772935274463415059
+        G2 = (3.0 - SQRT3) / 6.0
+    
+    x *= frequency
+    y *= frequency
+    
+    let i = fastFloor(x)
+    let j = fastFloor(y)
+    let xi = (x - i.float).float
+    let yi = (y - j.float).float
+    
+    let t = (xi + yi) * G2
+    let x0 = (xi - t).float
+    let y0 = (yi - t).float
+    
+    let i1 = i * PrimeX
+    let j1 = j * PrimeY
+    
+    var vx, vy: float
+    vx = 0
+    vy = 0
+    
+    let a = 0.5 - x0*x0 - y0*y0
+    if a > 0:
+        let aaaa = (a * a) * (a * a)
+        var xo, yo: float
+        if outGradOnly:
+            gradCoordOut(seed, i1, j1, xo, yo)
+        else:
+            gradCoordDual(seed, i1, j1, x0, y0, xo, yo)
+        vx += aaaa * xo
+        vy += aaaa * yo
+    
+    let c = (2.0 * (1.0 - 2.0 * G2) * (1.0 / G2 - 2.0)) * t + ((-2.0 * (1.0 - 2.0 * G2) * (1.0 - 2.0 * G2)) + a)
+    if c > 0:
+        let x2 = x0 + (2.0 * G2 - 1.0)
+        let y2 = y0 + (2.0 * G2 - 1.0)
+        let cccc = (c * c) * (c * c)
+        var xo, yo: float
+        if outGradOnly:
+            gradCoordOut(seed, i1 + PrimeX, j1 + PrimeY, xo, yo)
+        else:
+            gradCoordDual(seed, i1 + PrimeX, j1 + PrimeY, x2, y2, xo, yo)
+        vx += cccc * xo
+        vy += cccc * yo
+    
+    if y0 > x0:
+        let x1 = x0 + G2
+        let y1 = y0 + (G2 - 1.0)
+        let b = 0.5 - x1*x1 - y1*y1
+        if b > 0:
+            let bbbb = (b * b) * (b * b)
+            var xo, yo: float
+            if outGradOnly:
+                gradCoordOut(seed, i1, j1 + PrimeY, xo, yo)
+            else:
+                gradCoordDual(seed, i1, j1 + PrimeY, x1, y1, xo, yo)
+            vx += bbbb * xo
+            vy += bbbb * yo
+    else:
+        let x1 = x0 + (G2 - 1.0)
+        let y1 = y0 + G2
+        let b = 0.5 - x1*x1 - y1*y1
+        if b > 0:
+            let bbbb = (b * b) * (b * b)
+            var xo, yo: float
+            if outGradOnly:
+                gradCoordOut(seed, i1 + PrimeX, j1, xo, yo)
+            else:
+                gradCoordDual(seed, i1 + PrimeX, j1, x1, y1, xo, yo)
+            vx += bbbb * xo
+            vy += bbbb * yo
+    
+    xr += vx * warpAmp
+    yr += vy * warpAmp
 
 proc singleDomainWarpSimplexGradient(fnl: FnlNoise, seed: var int, warpAmp: float, frequency: float, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat, xr: var FnlFloat, yr: var FnlFloat, zr: var FnlFloat, outGradOnly: bool): void =
-    return
+    x *= frequency
+    y *= frequency
+    z *= frequency
+    
+    var i = fastRound(x)
+    var j = fastRound(y)
+    var k = fastRound(z)
+    var x0 = x - i.float
+    var y0 = y - j.float
+    var z0 = z - k.float
+    
+    var xNSign = (-1.0 - x0).int or 1
+    var yNSign = (-1.0 - y0).int or 1
+    var zNSign = (-1.0 - z0).int or 1
+    
+    var ax0 = xNSign.float * -x0
+    var ay0 = yNSign.float * -y0
+    var az0 = zNSign.float * -z0
+    
+    let i1 = i * PrimeX
+    let j1 = j * PrimeY
+    let k1 = k * PrimeZ
+    
+    var vx, vy, vz: float
+    vx = 0
+    vy = 0
+    vz = 0
+    
+    var a = (0.6 - x0 * x0) - (y0 * y0 + z0 * z0)
+    
+    for l in 0 .. 1:
+        if a > 0:
+            let aaaa = (a * a) * (a * a)
+            var xo, yo, zo: float
+            if outGradOnly:
+                gradCoordOut(seed, i1, j1, k1, xo, yo, zo)
+            else:
+                gradCoordDual(seed, i1, j1, k1, x0, y0, z0, xo, yo, zo)
+            vx += aaaa * xo
+            vy += aaaa * yo
+            vz += aaaa * zo
+        
+        var b = a
+        var i2 = i1
+        var j2 = j1
+        var k2 = k1
+        var x1 = x0
+        var y1 = y0
+        var z1 = z0
+        
+        if ax0 >= ay0 and ax0 >= az0:
+            x1 += xNSign.float
+            b += ax0 + ax0
+            i2 -= xNSign * PrimeX
+        elif ay0 > ax0 and ay0 >= az0:
+            y1 += yNSign.float
+            b += ay0 + ay0
+            j2 -= yNSign * PrimeY
+        else:
+            z1 += zNSign.float
+            b += az0 + az0
+            k2 -= zNSign * PrimeZ
+        
+        if b > 1:
+            b -= 1
+            let bbbb = (b * b) * (b * b)
+            var xo, yo, zo: float
+            if outGradOnly:
+                gradCoordOut(seed, i2, j2, k2, xo, yo, zo)
+            else:
+                gradCoordDual(seed, i2, j2, k2, x1, y1, z1, xo, yo, zo)
+            vx += bbbb * xo
+            vy += bbbb * yo
+            vz += bbbb * zo
+        
+        if l == 1:
+            break
+        
+        ax0 = 0.5 - ax0
+        ay0 = 0.5 - ay0
+        az0 = 0.5 - az0
+        
+        x0 = xNSign.float * ax0
+        y0 = yNSign.float * ay0
+        z0 = zNSign.float * az0
+        
+        a += (0.75 - ax0) - (ay0 + az0)
+        
+        i += (xNSign shr 1) and PrimeX
+        j += (yNSign shr 1) and PrimeY
+        k += (zNSign shr 1) and PrimeZ
+        
+        xNSign = -xNSign
+        yNSign = -yNSign
+        zNSign = -zNSign
+        
+        seed += 1293373
+    
+    xr += vx * warpAmp
+    yr += vy * warpAmp
+    zr += vz * warpAmp
 
 
 proc setSeed*(fnl: var FnlNoise, seed: int) =
@@ -1285,8 +1726,6 @@ proc setNoiseType*(fnl: var FnlNoise, noiseType: FnlNoiseType) =
     fnl.noiseType = noiseType
     updateTransformType(fnl)
 
-
-### Template function names here for the moment until I finish implemnting them all
 proc genNoiseSingle(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat): float =
     case fnl.noiseType
         of FnlNoiseType.OpenSimplex2:
@@ -1301,8 +1740,8 @@ proc genNoiseSingle(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFlo
             result = singleValueCubic(fnl, seed, x, y)
         of FnlNoiseType.Value:
             result = singleValue(fnl, seed, x, y)
-        else:
-            result = 0.0
+        #else:
+        #    result = 0.0
 
 proc genNoiseSingle(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): float =
     case fnl.noiseType
@@ -1318,8 +1757,8 @@ proc genNoiseSingle(fnl: FnlNoise, seed: var int, x: var FnlFloat, y: var FnlFlo
             result = singleValueCubic(fnl, seed, x, y, z)
         of FnlNoiseType.Value:
             result = singleValue(fnl, seed, x, y, z)
-        else:
-            result = 0.0
+        #else:
+        #    result = 0.0
 
 ### fractal FBm
 
@@ -1475,6 +1914,13 @@ proc domainWarp*(fnl: var FnlNoise, x: var FnlFloat, y: var FnlFloat): void =
         else:
             domainWarpSingle(fnl, x, y)
 
+proc domainWarp*(fnl: var FnlNoise, x: var float, y: var float): void =
+    var xFF = FnlFloat(x)
+    var yFF = FnlFloat(y)
+    domainWarp(fnl, xFF, yFF)
+    x = xFF.float
+    y = yFF.float
+
 proc domainWarp*(fnl: var FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var FnlFloat): void =
     case fnl.fractalType:
         of FnlFractalType.DomainWarpProgressive:
@@ -1483,3 +1929,12 @@ proc domainWarp*(fnl: var FnlNoise, x: var FnlFloat, y: var FnlFloat, z: var Fnl
             domainWarpFractalIndependent(fnl, x, y, z)
         else:
             domainWarpSingle(fnl, x, y, z)
+
+proc domainWarp*(fnl: var FnlNoise, x: var float, y: var float, z: var float): void =
+    var xFF = FnlFloat(x)
+    var yFF = FnlFloat(y)
+    var zFF = FnlFloat(z)
+    domainWarp(fnl, xFF, yFF, zFF)
+    x = xFF.float
+    y = yFF.float
+    z = zFF.float
